@@ -1,9 +1,46 @@
 #include <iostream> 
 #include <vector> 
 #include <cstddef> 
+#include <limits> 
 
 #include "cuda.hpp"
 #include "cuda_runtime.h"
+
+__global__ void assign_closest_centroid(
+    const double* points,
+    const double* old_centroids,
+    const double* centroids,
+    int* labels,
+    int* cluster_counts, 
+    int num_points,
+    int dims, 
+    int num_clusters
+) {
+    int point_index = blockIdx.x * blockDim.x + threadIdx.x;
+     
+    if (point_index >= num_points) {
+        return; 
+    }
+
+    double min_distance = std::numeric_limits<double>::infinity(); 
+    for (int cluster=0; cluster < num_clusters; ++cluster) {
+        double distance = 0; 
+        for (int offset=0; offset < dims; ++offset) {
+            double difference = old_centroids[cluster * dims + offset] - points[point * dims + offset];
+            distance += difference * difference;
+        }
+        if (distance < min_distance) {
+            min_distance = distance;
+            labels[point_index] = cluster; 
+        }
+        atomicAdd(&cluster_counts[cluster], 1); 
+        for (int dim = 0; dim < dims; ++dim) {
+            atomicAdd(&centroids[cluster * dims + dim],
+                points[point_index * dims + dim]);
+        }
+    }
+    
+}
 
 
 void cuda_kmeans(
@@ -43,12 +80,23 @@ void cuda_kmeans(
     cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
     
     // 1. Caclulate closest centroid for each point (labels) 
-
+    int blocks = (opts -> num_points + 255) / 256;
+    assign_closest_centroid<<<blocks, 256>>>(
+        device_points,
+        device_old_centroids,
+        device_centroids,
+        device_labels,
+        device_cluster_counts,
+        opts->num_points,
+        opts->dims,
+        opts->num_clusters
+    );
     // TODO: copy out centroids, labels, iteration times from final iteration 
 
     // Cleanup 
     cudaFree(device_cluster_counts);
     cudaFree(device_labels);
+    cudaFree(device_old_centroids);
     cudaFree(device_centroids);
     cudaFree(device_points);
     cudaDeviceSynchronize();
