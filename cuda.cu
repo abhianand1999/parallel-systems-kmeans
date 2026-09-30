@@ -3,7 +3,7 @@
 #include "cuda.hpp"
 #include "cuda_runtime.h"
 
-_global__ void helloFromGPU(void) {
+__global__ void helloFromGPU(void) {
     printf(“Hello World from GPU!\n”);
 }
 
