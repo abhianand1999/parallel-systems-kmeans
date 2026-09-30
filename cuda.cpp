@@ -19,8 +19,7 @@ void kmeans(KMeansOptions& opts) {
     double time_per_iteration_ms = 0.0;
     int iterations = 0;
 
-    cuda_kmeans(&opts, &time_per_iteration_ms, &iterations);
+    cuda_kmeans(&opts, &centroids, &labels, &time_per_iteration_ms, &iterations);
 
-    // display outputs 
-    // display_outputs(&opts, centroids, labels, iterations, time_per_iteration_ms);
+    display_outputs(&opts, centroids, labels, iterations, time_per_iteration_ms);
 }
