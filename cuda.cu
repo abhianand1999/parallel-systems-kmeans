@@ -19,7 +19,7 @@ void cuda_kmeans(
     Copy data back from GPU memory to CPU memory.
     */
     size_t point_bytes = opts->input_data_size * sizeof(double);
-    size_t centroid_bytes = opts->num_clusters * sizeof(double); 
+    size_t centroid_bytes = (opts->num_clusters * opts->dims) * sizeof(double); 
     size_t labels_bytes = opts->num_points * sizeof(int); 
     size_t cluster_count_bytes = opts->num_clusters * sizeof(int); 
 
@@ -44,5 +44,12 @@ void cuda_kmeans(
     
     // 1. Caclulate closest centroid for each point (labels) 
 
+    // TODO: copy out centroids, labels, iteration times from final iteration 
+
+    // Cleanup 
+    cudaFree(device_cluster_counts);
+    cudaFree(device_labels);
+    cudaFree(device_centroids);
+    cudaFree(device_points);
     cudaDeviceSynchronize();
 }
