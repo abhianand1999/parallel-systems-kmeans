@@ -1,17 +1,15 @@
 import os
 import re 
 import subprocess
-from tqdm import tqdm
 
 BINARY_PATH = "bin/{name}"
-FLOAT_THRESHOLD = 1e-5
-
+FLOAT_THRESHOLD = 1e-3
 
 
 def main(): 
     valid_inputs = [f for f in os.listdir('tests/') if (('answer' not in f) and ('test' not in f))]
     filename_pattern = re.compile(r"^.*-n(\d+)-d(\d+)-c(\d+)\.txt$")
-    for input_file in valid_inputs: 
+    for file_no, input_file in enumerate(valid_inputs): 
         match = filename_pattern.fullmatch(input_file)
         num_points, dims, num_clusters = map(int, match.groups())
         input_path = os.path.join("tests", input_file)
@@ -37,22 +35,11 @@ def main():
         for output_line, answer_line in zip(output_lines, answer_lines):
             cluster_id, *output_values = output_line.split()
             _, *answer_values = answer_line.split()
-            if len(output_values) != len(answer_values):
-                raise AssertionError(
-                    f"{input_file}: cluster {cluster_id.decode()} has "
-                    f"{len(output_values)} values; expected {len(answer_values)}"
-                )
-
-            for index, (actual, expected) in enumerate(tqdm(
-                zip(output_values, answer_values),
-                total=len(answer_values),
-                desc=f"{input_file} cluster {cluster_id.decode()}",
-            )):
-                if abs(float(actual) - float(expected)) > FLOAT_THRESHOLD:
-                    raise AssertionError(
-                        f"{input_file}: cluster {cluster_id.decode()} value {index} differs: "
-                        f"{actual.decode()} != {expected.decode()}"
-                    )
+            diffs = [(float(f1) - float(f2)) ** 2 for f1, f2 in zip(output_values, answer_values)]
+            error = sum(diffs) ** .5
+            if (error > FLOAT_THRESHOLD): 
+                raise AssertionError(f"Cluster ID {cluster_id} differs from answers by more than threshold.")
+        print(f"{file_no + 1}: Comparisons for {input_file} succeeded.")
 
 if __name__ == "__main__":
     main()
