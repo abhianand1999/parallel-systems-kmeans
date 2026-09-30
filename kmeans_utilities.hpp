@@ -11,7 +11,7 @@ struct KMeansOptions {
 
     int num_points = 0; 
     int input_data_size;
-    std::vector<std::vector<double>> input_data;
+    std::vector<double> input_data;
 
     int max_num_iter = 150;
     double threshold = 10e-5; 
@@ -28,7 +28,7 @@ int kmeans_rand();
 // stdout 
 void display_outputs(
     KMeansOptions* opts,
-    std::vector<std::vector<double>>& centroids, 
+    std::vector<double>& centroids, 
     std::vector<int>& labels,
     int iterations,
     double time_per_iteration_ms

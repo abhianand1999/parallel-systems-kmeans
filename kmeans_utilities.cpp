@@ -72,16 +72,16 @@ bool read_data(KMeansOptions* opts) {
     }
     opts->input_data_size = input_data_size; 
 
-    std::vector<std::vector<double>> data(opts->num_points, std::vector<double>(opts->dims, 0.0));
-    for (int i = 0; i < opts->num_points; ++i) {
+    std::vector<double> data(opts->num_points * opts->dims, 0.0);
+    for (int point=0; point < opts->num_points; ++point) {
         int data_index; 
         if (!(input_file >> data_index)) {
             std::cerr << "Missing data index in input file.\n";
             return false;
         }
-        for (int j = 0; j < opts -> dims; ++j) {
-            if (!(input_file >> data[i][j])) {
-                std::cerr << "Missing data for index " << data_index << " and position " << j << "\n";
+        for (int dim=0; dim < opts->dims; ++dim) {
+            if (!(input_file >> data[point * opts->dims + dim])) {
+                std::cerr << "Missing data for index " << data_index << " and position " << dim << "\n";
             }
         }
     }
@@ -108,7 +108,7 @@ void kmeans_srand(unsigned int seed) {
 // stdout
 void display_outputs(
     KMeansOptions* opts, 
-    std::vector<std::vector<double>>& centroids, 
+    std::vector<double>& centroids, 
     std::vector<int>& labels,
     int iterations,
     double time_per_iteration_ms
@@ -118,7 +118,7 @@ void display_outputs(
         for (int clusterId = 0; clusterId < opts->num_clusters; clusterId ++){
             printf("%d ", clusterId);
             for (int d = 0; d < opts->dims; d++) {
-                printf("%.17g ", centroids[clusterId][d]);
+                printf("%lf ", centroids[clusterId * opts->dims + d]);
             }
             printf("\n");
         }
