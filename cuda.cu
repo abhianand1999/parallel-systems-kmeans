@@ -23,9 +23,25 @@ void cuda_kmeans(
     size_t labels_bytes = opts->num_points * sizeof(int); 
     size_t cluster_count_bytes = opts->num_clusters * sizeof(int); 
 
-    size_t float_threshold = sizeof(float); 
-    size_t max_iterations = sizeof(int); 
+    double* device_points = nullptr;
+    cudaMalloc((void**) &device_points, point_bytes);
 
+    double* device_centroids = nullptr; 
+    cudaMalloc((void**) &device_centroids, centroid_bytes);
+
+    double* device_old_centroids = nullptr; 
+    cudaMalloc((void**) &device_old_centroids, centroid_bytes);
+
+    int* device_labels = nullptr;
+    cudaMalloc((void**) &device_labels, labels_bytes);
+
+    int* device_cluster_counts = nullptr;
+    cudaMalloc((void**) &device_cluster_counts, cluster_count_bytes);
+
+    cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_centroids, centroids.data(), centroid_bytes, cudaMemcpyHostToDevice);
+    cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
+    
     // 1. Caclulate closest centroid for each point (labels) 
 
     cudaDeviceSynchronize();
