@@ -62,7 +62,7 @@
 # Specification for sequential implementation of kmeans
 #
 [Sequential]
-How_To_Compile: g++ main.cpp kmeans_utilities.cpp sequential.cpp -o bin/sequential
+How_To_Compile: g++ -std=c++17 main.cpp kmeans_utilities.cpp sequential.cpp -o bin/sequential
 Executable: bin/sequential
 Extra_Args:
 
