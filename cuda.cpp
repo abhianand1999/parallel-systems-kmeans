@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include "kmeans_utilities.hpp"
+#include "cuda.hpp"
 
 void kmeans(KMeansOptions& opts) {
     // Set up required inputs (centroids and labels)
