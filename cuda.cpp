@@ -22,5 +22,5 @@ void kmeans(KMeansOptions& opts) {
     cuda_kmeans(&opts, &time_per_iteration_ms, &iterations);
 
     // display outputs 
-    display_outputs(&opts, centroids, labels, iterations, time_per_iteration_ms);
+    // display_outputs(&opts, centroids, labels, iterations, time_per_iteration_ms);
 }

@@ -9,4 +9,5 @@ __global__ void helloFromGPU(void) {
 
 void cuda_kmeans(KMeansOptions* opts, double* time_per_iteration_ms, int* iterations) {
     helloFromGPU<<<1,1>>>();
+    cudaDeviceSynchronize();
 }
