@@ -39,7 +39,7 @@ void cuda_kmeans(
     cudaMalloc((void**) &device_cluster_counts, cluster_count_bytes);
 
     cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(device_centroids, centroids.data(), centroid_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
     cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
     
     // 1. Caclulate closest centroid for each point (labels) 
