@@ -21,7 +21,7 @@ bool parse_arguments(int argc, char* argv[], KMeansOptions* opts) {
         }
 
         seen_flags.emplace(argv[i]);
-        std::string_view flag = std::string_view(argv[i]);
+        std::string flag(argv[i]);
 
         if (!flag.compare("-c")) {
             opts -> output_centroids = true;
@@ -33,17 +33,17 @@ bool parse_arguments(int argc, char* argv[], KMeansOptions* opts) {
                 return false;
             }
             
-            if (!flag.compare("-k")) {
+            if (flag == "-k") {
                 opts -> num_clusters = std::atoi(argv[i+1]);
-            } else if (!flag.compare("-d")) {
+            } else if (flag == "-d") {
                 opts -> dims = std::atoi(argv[i+1]);
-            } else if (!flag.compare("-i")) {
+            } else if (flag == "-i") {
                 opts -> input_file = argv[i+1];
-            } else if (!flag.compare("-m")) {
+            } else if (flag == "-m") {
                 opts -> max_num_iter = std::atoi(argv[i+1]);
-            } else if (!flag.compare("-t")) {
+            } else if (flag == "-t") {
                 opts -> threshold = std::atof(argv[i+1]);
-            } else if (!flag.compare("-s")) {
+            } else if (flag == "-s") {
                 opts -> seed = std::atoi(argv[i+1]);
             }
             i += 2; 

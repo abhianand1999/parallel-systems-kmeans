@@ -11,3 +11,4 @@
 // calculate differences b/w old and new in cuda itself
 
 // transfer results and timing out 
+#include <iostream>
