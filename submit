@@ -80,8 +80,8 @@ Extra_Args:
 # using CUDA
 #
 [CUDA basic]
-How_To_Compile:
-Executable:
+How_To_Compile: nvcc -std=c++14 main.cpp kmeans_utilities.cpp cuda.cpp cuda.cu -o bin/cuda
+Executable: bin/cuda
 Extra_Args:
 
 #
