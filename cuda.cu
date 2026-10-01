@@ -66,13 +66,13 @@ __global__ void calculate_centroids(
         
         // Normalization
         for (int d = 0; d < dims; ++d) {
-            centroids[cluster_index * dims + d] /= cluster_counds[cluster_index]; 
+            centroids[cluster_index * dims + d] /= cluster_counts[cluster_index]; 
         }
 
     } else {
         // Fallback
         for (int offset=0; offset<dims; ++offset) {
-            centroids[cluster_index * dims + offset] = old_centroids[cluster_index * opts.dims + offset];
+            centroids[cluster_index * dims + offset] = old_centroids[cluster_index * dims + offset];
         }
     }
 }
