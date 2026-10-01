@@ -186,7 +186,7 @@ void cuda_kmeans(
             opts->dims,
             opts->num_clusters
         );
-        cudaError_t error = cudaGetLastError();
+        error = cudaGetLastError();
         if (error != cudaSuccess) {
             std::cerr << "cuda sync failure";
         }
@@ -200,7 +200,7 @@ void cuda_kmeans(
             opts->threshold,
             device_not_converged
         );  
-        cudaError_t error = cudaGetLastError();
+        error = cudaGetLastError();
         if (error != cudaSuccess) {
             std::cerr << "cuda sync failure";
         }
