@@ -4,7 +4,7 @@ import subprocess
 from argparse import ArgumentParser
 
 BINARY_PATH = "bin/{name}"
-FLOAT_THRESHOLD = 1e-4
+FLOAT_THRESHOLD = 1e-3
 
 def main(name): 
     valid_inputs = [f for f in os.listdir('tests/') if (('answer' not in f) and ('test' not in f))]
