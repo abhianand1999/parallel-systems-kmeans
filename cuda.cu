@@ -58,21 +58,45 @@ __global__ void calculate_centroids(
     if (cluster_counts[cluster_index]) {
         for (int p = 0; p < num_points; ++p) {
             if (labels[p] == cluster_index) {
-                for (int d = 0; d < dims; ++d) {
-                    centroids[cluster_index * dims + d] += points[p * dims + d];
+                for (int offset = 0; offset < dims; ++offset) {
+                    centroids[cluster_index * dims + offset] += points[p * dims + offset];
                 }
             }
         }
         
         // Normalization
-        for (int d = 0; d < dims; ++d) {
-            centroids[cluster_index * dims + d] /= cluster_counts[cluster_index]; 
+        for (int offset = 0; offset < dims; ++offset) {
+            centroids[cluster_index * dims + offset] /= cluster_counts[cluster_index]; 
         }
 
     } else {
         // Fallback
         for (int offset=0; offset<dims; ++offset) {
             centroids[cluster_index * dims + offset] = old_centroids[cluster_index * dims + offset];
+        }
+    }
+}
+
+__global__ void check_convergence(
+    const double* centroids,
+    const double* old_centroids, 
+    int num_centroids, 
+    int dims,
+    float threshold, 
+    int* not_converged
+) {
+    int cluster_index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (cluster_index >= num_centroids) {
+        return;
+    }
+    double distance = 0.0; 
+
+    for (int offset=0; offset < dims; ++offset) {
+        double difference = centroids[cluster_index * dims + offset] - old_centroids[cluster_index * dims + offset];
+        distance += difference * difference;
+        if (distance > opts.threshold * opts.threshold) {
+            atomicExch(&not_converged, 1); 
+            break;
         }
     }
 }
@@ -109,12 +133,18 @@ void cuda_kmeans(
     int* device_cluster_counts = nullptr;
     cudaMalloc((void**) &device_cluster_counts, cluster_count_bytes);
 
+    int* device_not_converged = nullptr; 
+    cudaMalloc((void**) &device_not_converged, (size_t) sizeof(int)); 
+
     cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(device_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
     
-    while (*iterations < opts->max_num_iter) {
+    int not_converged = 1;
+
+    while ((*iterations < opts->max_num_iter) and (not_converged)) {
         // Clear states
         cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
+        cudaMemset(device_not_converged, 0, sizeof(int));
 
         // 1. Caclulate closest centroid for each point (labels) 
         int blocks = (opts -> num_points + 255) / 256;
@@ -144,8 +174,18 @@ void cuda_kmeans(
             opts->dims,
             opts->num_clusters
         );
-
+        
         // 3. Check for convergence
+        check_convergence<<<blocks, 256>>>(
+            device_centroids,
+            device_old_centroids,
+            opts->num_clusters,
+            opts->dims,
+            opts->threshold,
+            device_not_converged
+        );  
+
+        cudaMemcpy(&not_converged, not_converged, sizeof(int), cudaMemcpyDeviceToHost);
         ++(*iterations);
     }
 
@@ -154,6 +194,7 @@ void cuda_kmeans(
     cudaMemcpy(labels->data(), device_labels, labels_bytes, cudaMemcpyDeviceToHost);
 
     // Cleanup 
+    cudaFree(device_not_converged);
     cudaFree(device_cluster_counts);
     cudaFree(device_labels);
     cudaFree(device_old_centroids);
