@@ -94,8 +94,8 @@ __global__ void check_convergence(
     for (int offset=0; offset < dims; ++offset) {
         double difference = centroids[cluster_index * dims + offset] - old_centroids[cluster_index * dims + offset];
         distance += difference * difference;
-        if (distance > opts.threshold * opts.threshold) {
-            atomicExch(&not_converged, 1); 
+        if (distance > threshold * threshold) {
+            atomicExch(not_converged, 1); 
             break;
         }
     }
