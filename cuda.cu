@@ -23,6 +23,7 @@ __global__ void assign_closest_centroid(
     }
 
     double min_distance = DBL_MAX; 
+    int closest_cluster = -1;
     for (int cluster=0; cluster < num_clusters; ++cluster) {
         double distance = 0; 
         for (int offset=0; offset < dims; ++offset) {
@@ -31,12 +32,13 @@ __global__ void assign_closest_centroid(
         }
         if (distance < min_distance) {
             min_distance = distance;
-            labels[point_index] = cluster; 
+            closest_cluster = cluster;
         }
     }
-    atomicAdd(&cluster_counts[labels[point_index]], 1); 
+    labels[point_index] = closest_cluster; 
+    atomicAdd(&cluster_counts[closest_cluster], 1); 
     for (int dim = 0; dim < dims; ++dim) {
-        atomicAdd(&centroids[labels[point_index] * dims + dim],
+        atomicAdd(&centroids[closest_cluster * dims + dim],
             points[point_index * dims + dim]);
     }
 }
