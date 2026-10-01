@@ -16,9 +16,9 @@ __global__ void assign_closest_centroid(
     int dims, 
     int num_clusters
 ) {
-    int point_index = blockIdx.x * blockDim.x + threadIdx.x;
+    int point = blockIdx.x * blockDim.x + threadIdx.x;
      
-    if (point_index >= num_points) {
+    if (point >= num_points) {
         return; 
     }
 
@@ -27,7 +27,7 @@ __global__ void assign_closest_centroid(
     for (int cluster=0; cluster < num_clusters; ++cluster) {
         double distance = 0; 
         for (int offset=0; offset < dims; ++offset) {
-            double difference = centroids[cluster * dims + offset] - points[point_index * dims + offset];
+            double difference = centroids[cluster * dims + offset] - points[point * dims + offset];
             distance += difference * difference;
         }
         if (distance < min_distance) {
@@ -35,47 +35,90 @@ __global__ void assign_closest_centroid(
             closest_cluster = cluster;
         }
     }
-    labels[point_index] = closest_cluster; 
+    labels[point] = closest_cluster; 
     atomicAdd(&cluster_counts[closest_cluster], 1); 
 }
 
-__global__ void calculate_centroids(
-    const double* points,
+__global__ void centroid_sum(
+    const double* points, 
     const double* old_centroids,
-    double* centroids,
+    double* centroids, 
     int* labels,
     int* cluster_counts, 
     int num_points,
-    int dims, 
-    int num_clusters
+    int dims,
 ) {
-    int cluster_index = blockIdx.x * blockDim.x + threadIdx.x;
-     
-    if (cluster_index >= num_clusters) {
-        return; 
+    int point = blockIdx.x * blockDim.x + threadIdx.x; 
+    if (point >= num_points) {
+        return;
     }
-
-    if (cluster_counts[cluster_index]) {
-        for (int p = 0; p < num_points; ++p) {
-            if (labels[p] == cluster_index) {
-                for (int offset = 0; offset < dims; ++offset) {
-                    centroids[cluster_index * dims + offset] += points[p * dims + offset];
-                }
-            }
-        }
-        
-        // Normalization
-        for (int offset = 0; offset < dims; ++offset) {
-            centroids[cluster_index * dims + offset] /= cluster_counts[cluster_index]; 
-        }
-
-    } else {
-        // Fallback
-        for (int offset=0; offset<dims; ++offset) {
-            centroids[cluster_index * dims + offset] = old_centroids[cluster_index * dims + offset];
-        }
+    int cluster = labels[point]; 
+    for (int offset=0; offset < dims; ++offset) {
+        atomicAdd(&centroids[cluster * dims + offset], points[point * dims + offset]);
     }
 }
+
+__global__ void normalize_centroids(
+    double* centroids,
+    const double* old_centroids,
+    const int* cluster_counts,
+    int num_clusters,
+    int dims
+) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int cluster = index / dims; 
+    int offset = index % dims; 
+
+    if (index >= dims * num_clusters) {
+        return;
+    }
+
+    int cluster_count = cluster_counts[cluster]; 
+
+    if (!cluster_count) {
+        centroids[cluster * dims + offset] = old_centroids[cluster * dims + offset];
+    } else {
+        centroids[cluster * dims + offset] /= cluster_count;
+    }
+}
+
+// __global__ void calculate_centroids(
+//     const double* points,
+//     const double* old_centroids,
+//     double* centroids,
+//     int* labels,
+//     int* cluster_counts, 
+//     int num_points,
+//     int dims, 
+//     int num_clusters
+// ) {
+//     int cluster = blockIdx.x * blockDim.x + threadIdx.x;
+     
+//     if (cluster >= num_clusters) {
+//         return; 
+//     }
+
+//     if (cluster_counts[cluster]) {
+//         for (int p = 0; p < num_points; ++p) {
+//             if (labels[p] == cluster) {
+//                 for (int offset = 0; offset < dims; ++offset) {
+//                     centroids[cluster * dims + offset] += points[p * dims + offset];
+//                 }
+//             }
+//         }
+        
+//         // Normalization
+//         for (int offset = 0; offset < dims; ++offset) {
+//             centroids[cluster * dims + offset] /= cluster_counts[cluster]; 
+//         }
+
+//     } else {
+//         // Fallback
+//         for (int offset=0; offset<dims; ++offset) {
+//             centroids[cluster * dims + offset] = old_centroids[cluster * dims + offset];
+//         }
+//     }
+// }
 
 __global__ void check_convergence(
     const double* centroids,
@@ -85,14 +128,14 @@ __global__ void check_convergence(
     float threshold, 
     int* not_converged
 ) {
-    int cluster_index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (cluster_index >= num_centroids) {
+    int cluster = blockIdx.x * blockDim.x + threadIdx.x;
+    if (cluster >= num_centroids) {
         return;
     }
     double distance = 0.0; 
 
     for (int offset=0; offset < dims; ++offset) {
-        double difference = centroids[cluster_index * dims + offset] - old_centroids[cluster_index * dims + offset];
+        double difference = centroids[cluster * dims + offset] - old_centroids[cluster * dims + offset];
         distance += difference * difference;
         if (distance > threshold * threshold) {
             atomicExch(not_converged, 1); 
@@ -117,7 +160,8 @@ void cuda_kmeans(
     size_t centroid_bytes = (opts->num_clusters * opts->dims) * sizeof(double); 
     size_t labels_bytes = opts->num_points * sizeof(int); 
     size_t cluster_count_bytes = opts->num_clusters * sizeof(int); 
-
+    int nthreads = 256; 
+    
     double* device_points = nullptr;
     cudaMalloc((void**) &device_points, point_bytes);
 
@@ -155,8 +199,8 @@ void cuda_kmeans(
         cudaMemset(device_not_converged, 0, sizeof(int));
 
         // 1. Caclulate closest centroid for each point (labels) 
-        int blocks = (opts -> num_points + 255) / 256;
-        assign_closest_centroid<<<blocks, 256>>>(
+        int blocks = (opts -> num_points + nthreads-1) / nthreads;
+        assign_closest_centroid<<<blocks, nthreads>>>(
             device_points,
             device_old_centroids,
             device_centroids,
@@ -175,16 +219,42 @@ void cuda_kmeans(
         cudaMemset(device_centroids, 0.0, centroid_bytes); 
 
         // 2. Calculate new centroid 
-        blocks = (opts -> num_clusters + 255) / 256; 
-        calculate_centroids<<<blocks, 256>>>(
+        // blocks = (opts -> num_clusters + 255) / 256; 
+        // calculate_centroids<<<blocks, 256>>>(
+        //     device_points,
+        //     device_old_centroids, 
+        //     device_centroids,
+        //     device_labels,
+        //     device_cluster_counts,
+        //     opts->num_points,
+        //     opts->dims,
+        //     opts->num_clusters
+        // );
+        // error = cudaGetLastError();
+        // if (error != cudaSuccess) {
+        //     std::cerr << "cuda sync failure";
+        // }
+        centroid_sum<<<blocks, nthreads>>>(
             device_points,
-            device_old_centroids, 
+            device_old_centroids,
             device_centroids,
             device_labels,
             device_cluster_counts,
             opts->num_points,
-            opts->dims,
-            opts->num_clusters
+            opts->dims
+        );
+        error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            std::cerr << "cuda sync failure";
+        }
+
+        int normalization_blocks = (opts->dims * opts->num_clusters + nthreads-1)/ nthreads;
+        normalize_centroids<<<normalization_blocks, nthreads>>>(
+            device_centroids,
+            device_old_centroids,
+            device_cluster_counts,
+            opts->num_clusters,
+            opts->dims
         );
         error = cudaGetLastError();
         if (error != cudaSuccess) {
@@ -192,7 +262,8 @@ void cuda_kmeans(
         }
         
         // 3. Check for convergence
-        check_convergence<<<blocks, 256>>>(
+        int convergence_blocks = (opts->num_clusters + nthreads - 1) / nthreads;
+        check_convergence<<<convergence_blocks, nthreads>>>(
             device_centroids,
             device_old_centroids,
             opts->num_clusters,
