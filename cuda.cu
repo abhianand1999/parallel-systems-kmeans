@@ -141,6 +141,14 @@ void cuda_kmeans(
     
     int not_converged = 1;
 
+    // Timer
+    cudaEvent_t start_time;
+    cudaEvent_t end_time;
+    cudaEventCreate(&start_time);
+    cudaEventCreate(&end_time);
+
+    cudaEventRecord(start_time);
+
     while ((*iterations < opts->max_num_iter) and (not_converged)) {
         // Clear states
         cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
@@ -158,6 +166,10 @@ void cuda_kmeans(
             opts->dims,
             opts->num_clusters
         );
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            std::cerr << "cuda sync failure";
+        }
 
         std::swap(device_old_centroids, device_centroids);
         cudaMemset(device_centroids, 0.0, centroid_bytes); 
@@ -174,6 +186,10 @@ void cuda_kmeans(
             opts->dims,
             opts->num_clusters
         );
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            std::cerr << "cuda sync failure";
+        }
         
         // 3. Check for convergence
         check_convergence<<<blocks, 256>>>(
@@ -184,9 +200,24 @@ void cuda_kmeans(
             opts->threshold,
             device_not_converged
         );  
+        cudaError_t error = cudaGetLastError();
+        if (error != cudaSuccess) {
+            std::cerr << "cuda sync failure";
+        }
 
         cudaMemcpy(&not_converged, device_not_converged, sizeof(int), cudaMemcpyDeviceToHost);
         ++(*iterations);
+    }
+
+    cudaEventRecord(end_time);
+    cudaEventSynchronize(end_time);
+    float iteration_time_ms = 0.0f;
+    cudaEventElapsedTime(&iteration_time_ms, start_time, end_time);
+
+    if (!*iterations) {
+        *time_per_iteration_ms = 0.0;
+    } else {
+        *time_per_iteration_ms = iteration_time_ms / *iterations;
     }
 
     // Copy out data
