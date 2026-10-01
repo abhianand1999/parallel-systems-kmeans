@@ -61,6 +61,7 @@ __global__ void find_closest_centroid(
             atomicAdd(&cluster_counts[i], local_cluster_counts[i]);
         }
     }
+}
 
 __global__ void centroid_sum(
     double* points, 
