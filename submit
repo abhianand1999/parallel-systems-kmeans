@@ -80,7 +80,7 @@ Extra_Args:
 # using CUDA
 #
 [CUDA basic]
-How_To_Compile: nvcc -std=c++14 main.cpp kmeans_utilities.cpp cuda.cpp cuda.cu -o bin/cuda
+How_To_Compile: nvcc -std=c++14 -arch=sm_75 main.cpp kmeans_utilities.cpp cuda.cpp cuda.cu -o bin/cuda
 Executable: bin/cuda
 Extra_Args:
 
@@ -89,8 +89,8 @@ Extra_Args:
 # using Shared Memory
 #
 [CUDA shared]
-How_To_Compile:
-Executable:
+How_To_Compile: nvcc -std=c++14 -arch=sm_75 main.cpp kmeans_utilities.cpp cuda_shared_memory.cpp cuda_shared_memory.cu -o bin/cuda_shared_memory
+Executable: bin/cuda_shared_memory
 Extra_Args:
 
 #
