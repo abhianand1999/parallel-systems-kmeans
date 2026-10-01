@@ -34,9 +34,9 @@ __global__ void assign_closest_centroid(
             labels[point_index] = cluster; 
         }
     }
-    atomicAdd(&cluster_counts[cluster], 1); 
+    atomicAdd(&cluster_counts[labels[point_index]], 1); 
     for (int dim = 0; dim < dims; ++dim) {
-        atomicAdd(&centroids[cluster * dims + dim],
+        atomicAdd(&centroids[labels[point_index] * dims + dim],
             points[point_index * dims + dim]);
     }
 }
