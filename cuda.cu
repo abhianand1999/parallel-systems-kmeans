@@ -149,7 +149,10 @@ void cuda_kmeans(
         ++(*iterations);
     }
 
-    
+    // Copy out data
+    cudaMemcpy(centroids->data(), device_centroids, centroid_bytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(labels->data(), device_labels, labels_bytes, cudaMemcpyDeviceToHost);
+
     // Cleanup 
     cudaFree(device_cluster_counts);
     cudaFree(device_labels);
