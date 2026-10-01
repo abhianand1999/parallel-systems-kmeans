@@ -65,35 +65,52 @@ __global__ void find_closest_centroid(
 
 __global__ void centroid_sum(
     double* points, 
-    double* old_centroids,
     double* centroids, 
     int* labels,
-    int* cluster_counts, 
     int num_points,
-    int dims,
-    int num_clusters
+    int dims
 ) {
-    // set up shared mem 
-    extern __shared__ double local_centroid_sums[]; 
-    for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
-        local_centroid_sums[i] = 0;
-    }
-    __syncthreads(); 
-
     int point = blockIdx.x * blockDim.x + threadIdx.x; 
-    if (point < num_points) {
-        int cluster = labels[point]; 
-        for (int offset=0; offset < dims; ++offset) {
-            atomicAdd(&local_centroid_sums[cluster * dims + offset], points[point * dims + offset]);
-        }
+    if (point >= num_points) {
+        return;
     }
-    __syncthreads();
-    for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
-        if (local_centroid_sums[i]) {
-            atomicAdd(&centroids[i], local_centroid_sums[i]);
-        }
+    int cluster = labels[point]; 
+    for (int offset=0; offset < dims; ++offset) {
+        atomicAdd(&centroids[cluster * dims + offset], points[point * dims + offset]);
     }
 }
+
+// __global__ void centroid_sum(
+//     double* points, 
+//     double* old_centroids,
+//     double* centroids, 
+//     int* labels,
+//     int* cluster_counts, 
+//     int num_points,
+//     int dims,
+//     int num_clusters
+// ) {
+//     // set up shared mem 
+//     extern __shared__ double local_centroid_sums[]; 
+//     for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
+//         local_centroid_sums[i] = 0;
+//     }
+//     __syncthreads(); 
+
+//     int point = blockIdx.x * blockDim.x + threadIdx.x; 
+//     if (point < num_points) {
+//         int cluster = labels[point]; 
+//         for (int offset=0; offset < dims; ++offset) {
+//             atomicAdd(&local_centroid_sums[cluster * dims + offset], points[point * dims + offset]);
+//         }
+//     }
+//     __syncthreads();
+//     for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
+//         if (local_centroid_sums[i]) {
+//             atomicAdd(&centroids[i], local_centroid_sums[i]);
+//         }
+//     }
+// }
 
 __global__ void normalize_centroids(
     double* centroids,
@@ -219,16 +236,23 @@ void cuda_shared_memory_kmeans(
         std::swap(device_old_centroids, device_centroids);
         cudaMemset(device_centroids, 0.0, centroid_bytes); 
 
-        size_t local_centroid_bytes = opts->num_clusters * opts -> dims * sizeof(double);
-        centroid_sum<<<blocks, nthreads, local_centroid_bytes>>>(
+        // size_t local_centroid_bytes = opts->num_clusters * opts -> dims * sizeof(double);
+        // centroid_sum<<<blocks, nthreads, local_centroid_bytes>>>(
+        //     device_points,
+        //     device_old_centroids,
+        //     device_centroids,
+        //     device_labels,
+        //     device_cluster_counts,
+        //     opts->num_points,
+        //     opts->dims,
+        //     opts->num_clusters
+        // );
+        centroid_sum<<<blocks, nthreads>>>(
             device_points,
-            device_old_centroids,
             device_centroids,
             device_labels,
-            device_cluster_counts,
             opts->num_points,
-            opts->dims,
-            opts->num_clusters
+            opts->dims
         );
         error = cudaGetLastError();
         if (error != cudaSuccess) {
