@@ -57,7 +57,7 @@ __global__ void find_closest_centroid(
 
     // update global counts
     for (int i=threadIdx.x; i < num_clusters; i+=blockDim.x) {
-        if (local_cluster_counts[i] > 0) {
+        if (local_cluster_counts[i]) {
             atomicAdd(&cluster_counts[i], local_cluster_counts[i]);
         }
     }
@@ -81,17 +81,15 @@ __global__ void centroid_sum(
     __syncthreads(); 
 
     int point = blockIdx.x * blockDim.x + threadIdx.x; 
-    if (point >= num_points) {
-        return;
+    if (point < num_points) {
+        int cluster = labels[point]; 
+        for (int offset=0; offset < dims; ++offset) {
+            atomicAdd(&local_centroid_sums[cluster * dims + offset], points[point * dims + offset]);
+        }
     }
-    int cluster = labels[point]; 
-    for (int offset=0; offset < dims; ++offset) {
-        atomicAdd(&local_centroid_sums[cluster * dims + offset], points[point * dims + offset]);
-    }
-
     __syncthreads();
     for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
-        if (local_centroid_sums[i] >0) {
+        if (local_centroid_sums[i]) {
             atomicAdd(&centroids[i], local_centroid_sums[i]);
         }
     }
@@ -126,7 +124,7 @@ __global__ void check_convergence(
     const double* old_centroids, 
     int num_centroids, 
     int dims,
-    float threshold, 
+    double threshold, 
     int* not_converged
 ) {
     int cluster = blockIdx.x * blockDim.x + threadIdx.x;

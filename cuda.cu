@@ -41,10 +41,8 @@ __global__ void assign_closest_centroid(
 
 __global__ void centroid_sum(
     double* points, 
-    double* old_centroids,
     double* centroids, 
     int* labels,
-    int* cluster_counts, 
     int num_points,
     int dims
 ) {
@@ -125,7 +123,7 @@ __global__ void check_convergence(
     const double* old_centroids, 
     int num_centroids, 
     int dims,
-    float threshold, 
+    double threshold, 
     int* not_converged
 ) {
     int cluster = blockIdx.x * blockDim.x + threadIdx.x;
@@ -236,10 +234,8 @@ void cuda_kmeans(
         // }
         centroid_sum<<<blocks, nthreads>>>(
             device_points,
-            device_old_centroids,
             device_centroids,
             device_labels,
-            device_cluster_counts,
             opts->num_points,
             opts->dims
         );
