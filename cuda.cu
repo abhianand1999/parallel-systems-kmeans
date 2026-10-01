@@ -33,13 +33,12 @@ __global__ void assign_closest_centroid(
             min_distance = distance;
             labels[point_index] = cluster; 
         }
-        atomicAdd(&cluster_counts[cluster], 1); 
-        for (int dim = 0; dim < dims; ++dim) {
-            atomicAdd(&centroids[cluster * dims + dim],
-                points[point_index * dims + dim]);
-        }
     }
-    
+    atomicAdd(&cluster_counts[cluster], 1); 
+    for (int dim = 0; dim < dims; ++dim) {
+        atomicAdd(&centroids[cluster * dims + dim],
+            points[point_index * dims + dim]);
+    }
 }
 
 
@@ -77,6 +76,7 @@ void cuda_kmeans(
 
     cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(device_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(device_old_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
     cudaMemset(device_cluster_counts, 0, cluster_count_bytes); 
     
     // 1. Caclulate closest centroid for each point (labels) 
