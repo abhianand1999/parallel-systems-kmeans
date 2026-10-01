@@ -6,10 +6,11 @@ from argparse import ArgumentParser
 BINARY_PATH = "bin/{name}"
 FLOAT_THRESHOLD = 1e-3
 
-
 def main(name): 
     valid_inputs = [f for f in os.listdir('tests/') if (('answer' not in f) and ('test' not in f))]
     filename_pattern = re.compile(r"^.*-n(\d+)-d(\d+)-c(\d+)\.txt$")
+    binary_path_formatted = BINARY_PATH.format(name=name)
+    print(f"Running tests for target binary: {binary_path_formatted}")
     for file_no, input_file in enumerate(valid_inputs): 
         match = filename_pattern.fullmatch(input_file)
         num_points, dims, num_clusters = map(int, match.groups())
@@ -17,7 +18,7 @@ def main(name):
         output_path = os.path.join("tests", f"{os.path.splitext(input_file)[0]}-test.txt")
         with open(output_path, "w") as output_file:
             subprocess.run(
-                [BINARY_PATH.format(name=name), "-k", str(num_clusters),
+                [binary_path_formatted, "-k", str(num_clusters),
                  "-d", str(dims), "-i", input_path, "-c"],
                 stdout=output_file,
                 check=True,
