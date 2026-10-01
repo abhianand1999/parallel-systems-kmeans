@@ -14,7 +14,7 @@ struct KMeansOptions {
     std::vector<double> input_data;
 
     int max_num_iter = 150;
-    double threshold = 10e-5; 
+    double threshold = 1e-5; 
     bool output_centroids = false; 
     int seed = 8675309;
 };

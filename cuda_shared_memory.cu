@@ -6,6 +6,16 @@
 #include "cuda_shared_memory.hpp"
 #include "cuda_runtime.h"
 
+/*
+load data from gmem to shmem 
+__syncthreads();
+update shmem
+__syncthreads();
+store data from shmem to gmem
+It is very easy to make mistakes when you do not need all threads to load and store the data but need them all to update the data in shmem. This happens when the total number of threads does not match the number of tasks (such as points). Be careful when you try to mask some threads when using shared memory.
+ */
+
+
 __global__ void assign_closest_centroid(
     const double* points,
     const double* old_centroids,
