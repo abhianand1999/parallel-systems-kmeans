@@ -40,13 +40,13 @@ __global__ void assign_closest_centroid(
 }
 
 __global__ void centroid_sum(
-    const double* points, 
-    const double* old_centroids,
+    double* points, 
+    double* old_centroids,
     double* centroids, 
     int* labels,
     int* cluster_counts, 
     int num_points,
-    int dims,
+    int dims
 ) {
     int point = blockIdx.x * blockDim.x + threadIdx.x; 
     if (point >= num_points) {
