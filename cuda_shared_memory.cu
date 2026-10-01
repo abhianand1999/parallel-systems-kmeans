@@ -16,7 +16,7 @@ It is very easy to make mistakes when you do not need all threads to load and st
  */
 
 
-__global__ void assign_closest_centroid(
+__global__ void find_closest_centroid(
     const double* points,
     const double* old_centroids,
     const double* centroids,
@@ -26,28 +26,41 @@ __global__ void assign_closest_centroid(
     int dims, 
     int num_clusters
 ) {
+    // set up shared mem
+    extern __shared__ int local_cluster_counts[]; // size dynamically injected on startup
+    for (int i=threadIdx.x; i < num_clusters; i+=blockDim.x) {
+        local_cluster_counts[i] = 0;
+    }
+    __syncthreads();
+
     int point = blockIdx.x * blockDim.x + threadIdx.x;
      
-    if (point >= num_points) {
-        return; 
+    if (point < num_points) {
+        double min_distance = DBL_MAX; 
+        int closest_cluster = -1;
+        for (int cluster=0; cluster < num_clusters; ++cluster) {
+            double distance = 0; 
+            for (int offset=0; offset < dims; ++offset) {
+                double difference = centroids[cluster * dims + offset] - points[point * dims + offset];
+                distance += difference * difference;
+            }
+            if (distance < min_distance) {
+                min_distance = distance;
+                closest_cluster = cluster;
+            }
+        }
+        labels[point] = closest_cluster; 
+        atomicAdd(&local_cluster_counts[closest_cluster], 1);
+        // atomicAdd(&cluster_counts[closest_cluster], 1); 
     }
+    __syncthreads();
 
-    double min_distance = DBL_MAX; 
-    int closest_cluster = -1;
-    for (int cluster=0; cluster < num_clusters; ++cluster) {
-        double distance = 0; 
-        for (int offset=0; offset < dims; ++offset) {
-            double difference = centroids[cluster * dims + offset] - points[point * dims + offset];
-            distance += difference * difference;
-        }
-        if (distance < min_distance) {
-            min_distance = distance;
-            closest_cluster = cluster;
+    // update global counts
+    for (int i=threadIdx.x; i < num_clusters; i+=blockDim.x) {
+        if (local_cluster_counts[i] > 0) {
+            atomicAdd(&cluster_counts[i], local_cluster_counts[i]);
         }
     }
-    labels[point] = closest_cluster; 
-    atomicAdd(&cluster_counts[closest_cluster], 1); 
-}
 
 __global__ void centroid_sum(
     double* points, 
@@ -172,7 +185,9 @@ void cuda_shared_memory_kmeans(
 
         // 1. Caclulate closest centroid for each point (labels) 
         int blocks = (opts -> num_points + nthreads-1) / nthreads;
-        assign_closest_centroid<<<blocks, nthreads>>>(
+        size_t local_count_bytes = opts->num_clusters * sizeof(int);
+
+        find_closest_centroid<<<blocks, nthreads, local_count_bytes>>>(
             device_points,
             device_old_centroids,
             device_centroids,
