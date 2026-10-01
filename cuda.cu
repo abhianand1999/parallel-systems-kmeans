@@ -9,7 +9,7 @@
 __global__ void assign_closest_centroid(
     const double* points,
     const double* old_centroids,
-    const double* centroids,
+    double* centroids,
     int* labels,
     int* cluster_counts, 
     int num_points,
