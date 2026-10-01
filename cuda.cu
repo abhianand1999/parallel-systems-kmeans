@@ -27,7 +27,7 @@ __global__ void assign_closest_centroid(
     for (int cluster=0; cluster < num_clusters; ++cluster) {
         double distance = 0; 
         for (int offset=0; offset < dims; ++offset) {
-            double difference = old_centroids[cluster * dims + offset] - points[point_index * dims + offset];
+            double difference = centroids[cluster * dims + offset] - points[point_index * dims + offset];
             distance += difference * difference;
         }
         if (distance < min_distance) {
@@ -111,7 +111,6 @@ void cuda_kmeans(
 
     cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(device_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(device_old_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
     
     while (*iterations < opts->max_num_iter) {
         // Clear states
