@@ -26,7 +26,7 @@ __global__ void assign_closest_centroid(
     for (int cluster=0; cluster < num_clusters; ++cluster) {
         double distance = 0; 
         for (int offset=0; offset < dims; ++offset) {
-            double difference = old_centroids[cluster * dims + offset] - points[point * dims + offset];
+            double difference = old_centroids[cluster * dims + offset] - points[point_index * dims + offset];
             distance += difference * difference;
         }
         if (distance < min_distance) {
