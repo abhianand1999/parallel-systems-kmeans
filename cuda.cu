@@ -185,7 +185,7 @@ void cuda_kmeans(
             device_not_converged
         );  
 
-        cudaMemcpy(&not_converged, not_converged, sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&not_converged, device_not_converged, sizeof(int), cudaMemcpyDeviceToHost);
         ++(*iterations);
     }
 
