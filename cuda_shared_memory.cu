@@ -70,15 +70,30 @@ __global__ void centroid_sum(
     int* labels,
     int* cluster_counts, 
     int num_points,
-    int dims
+    int dims,
+    int num_clusters
 ) {
+    // set up shared mem 
+    extern __shared__ double local_centroid_sums[]; 
+    for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
+        local_centroid_sums[i] = 0;
+    }
+    __syncthreads(); 
+
     int point = blockIdx.x * blockDim.x + threadIdx.x; 
     if (point >= num_points) {
         return;
     }
     int cluster = labels[point]; 
     for (int offset=0; offset < dims; ++offset) {
-        atomicAdd(&centroids[cluster * dims + offset], points[point * dims + offset]);
+        atomicAdd(&local_centroid_sums[cluster * dims + offset], points[point * dims + offset]);
+    }
+
+    __syncthreads();
+    for (int i=threadIdx.x; i < num_clusters * dims; i+=blockDim.x) {
+        if (local_centroid_sums[i] >0) {
+            atomicAdd(&centroids[i], local_centroid_sums[i]);
+        }
     }
 }
 
@@ -206,30 +221,16 @@ void cuda_shared_memory_kmeans(
         std::swap(device_old_centroids, device_centroids);
         cudaMemset(device_centroids, 0.0, centroid_bytes); 
 
-        // 2. Calculate new centroid 
-        // blocks = (opts -> num_clusters + 255) / 256; 
-        // calculate_centroids<<<blocks, 256>>>(
-        //     device_points,
-        //     device_old_centroids, 
-        //     device_centroids,
-        //     device_labels,
-        //     device_cluster_counts,
-        //     opts->num_points,
-        //     opts->dims,
-        //     opts->num_clusters
-        // );
-        // error = cudaGetLastError();
-        // if (error != cudaSuccess) {
-        //     std::cerr << "cuda sync failure";
-        // }
-        centroid_sum<<<blocks, nthreads>>>(
+        size_t local_centroid_bytes = opts->num_clusters * opts -> dims * sizeof(double);
+        centroid_sum<<<blocks, nthreads, local_centroid_bytes>>>(
             device_points,
             device_old_centroids,
             device_centroids,
             device_labels,
             device_cluster_counts,
             opts->num_points,
-            opts->dims
+            opts->dims,
+            opts->num_clusters
         );
         error = cudaGetLastError();
         if (error != cudaSuccess) {
