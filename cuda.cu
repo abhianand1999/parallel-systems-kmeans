@@ -1,7 +1,7 @@
 #include <iostream> 
 #include <vector> 
 #include <cstddef> 
-#include <limits> 
+#include <cfloat>
 
 #include "cuda.hpp"
 #include "cuda_runtime.h"
@@ -22,7 +22,7 @@ __global__ void assign_closest_centroid(
         return; 
     }
 
-    double min_distance = std::numeric_limits<double>::infinity(); 
+    double min_distance = DBL_MAX; 
     for (int cluster=0; cluster < num_clusters; ++cluster) {
         double distance = 0; 
         for (int offset=0; offset < dims; ++offset) {
