@@ -128,17 +128,18 @@ __global__ void check_convergence(
     int* not_converged
 ) {
     int cluster = blockIdx.x * blockDim.x + threadIdx.x;
-    if (cluster >= num_centroids) {
-        return;
-    }
-    double distance = 0.0; 
+    extern __shared__ double distances[]; 
+    
+    if (cluster < num_centroids) {
+        double distance = 0.0; 
 
-    for (int offset=0; offset < dims; ++offset) {
-        double difference = centroids[cluster * dims + offset] - old_centroids[cluster * dims + offset];
-        distance += difference * difference;
-        if (distance > threshold * threshold) {
-            atomicExch(not_converged, 1); 
-            break;
+        for (int offset=0; offset < dims; ++offset) {
+            double difference = centroids[cluster * dims + offset] - old_centroids[cluster * dims + offset];
+            distance += difference * difference;
+            if (distance > threshold * threshold) {
+                atomicExch(not_converged, 1); 
+                break;
+            }
         }
     }
 }
