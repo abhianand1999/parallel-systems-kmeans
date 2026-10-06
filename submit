@@ -71,8 +71,8 @@ Extra_Args:
 # using Thrust
 #
 [Thrust]
-How_To_Compile:
-Executable:
+How_To_Compile: nvcc -std=c++17 -arch=sm_75 main.cpp kmeans_utilities.cpp thrust.cpp thrust.cu -o bin/thrust
+Executable: bin/thrust
 Extra_Args:
 
 #
