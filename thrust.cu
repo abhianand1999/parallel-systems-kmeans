@@ -12,6 +12,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h> 
 #include <thrust/transform.h>
+#include <thrust/logical.h>
 
 #include "thrust.hpp"
 #include "cuda_runtime.h"
@@ -81,10 +82,10 @@ struct CalculateClusterCounts {
 
 
 struct CalculateNewCentroids {
-    thrust::device_vector<int>::iterator centroid_sums;
+    thrust::device_vector<double>::iterator centroid_sums;
     thrust::device_vector<int>::iterator cluster_counts; 
-    thrust::device_vector<int>::iterator centroids;
-    thrust::device_vector<int>::iterator old_centroids;
+    thrust::device_vector<double>::iterator centroids;
+    thrust::device_vector<double>::iterator old_centroids;
     int dims;
 
     __host__ __device__ void operator()(int i) const {
@@ -95,6 +96,30 @@ struct CalculateNewCentroids {
             centroids[i] = old_centroids[i];
         } else {
             centroids[i] = centroid_sums[i] / count;
+        }
+    }
+};
+
+
+struct CheckConvergence {
+    thrust::device_vector<double>::iterator centroids;
+    thrust::device_vector<double>::iterator old_centroids;
+    int dims;
+    double threshold;
+    
+    __host__ __device__ bool operator()(int cluster) const {
+        double distance_squared = 0.0;
+
+        for (int dim = 0; dim < dims; ++dim) {
+            int index = cluster * dims + dim;
+            double difference = centroids[index] - old_centroids[index];
+            distance_squared += difference * difference;
+        }
+
+        if (distance_squared > threshold * threshold) {
+            return false;
+        } else {
+            return true;
         }
     }
 };
@@ -112,7 +137,6 @@ void thrust_kmeans(
     thrust::device_vector<double> device_old_centroids(opts->num_clusters * opts->dims);
     thrust::device_vector<int> device_labels(opts->num_points);
     thrust::device_vector<int> device_cluster_counts(opts->num_clusters);
-    thrust::device_vector<int> device_not_converged(1);
     
     // additional ds for reduce by key - sums
     thrust::device_vector<int> sorted_labels(opts->num_points); 
@@ -140,7 +164,7 @@ void thrust_kmeans(
     while ((*iterations < opts->max_num_iter) and (not_converged)) {
         // Clear contents
         thrust::fill(device_cluster_counts.begin(), device_cluster_counts.end(), 0);
-        device_not_converged[0] = 0;
+        not_converged = 1;
 
         thrust::for_each(
             thrust::make_counting_iterator(0),
@@ -234,11 +258,21 @@ void thrust_kmeans(
             }
         );
 
+        // check convergence
+        bool converged = thrust::all_of(
+            thrust::make_counting_iterator(0),
+            thrust::make_counting_iterator(opts->num_clusters),
+            CheckConvergence{
+                device_centroids.begin(),
+                device_old_centroids.begin(),
+                opts->dims,
+                opts->threshold
+            }
+        );
         // Copy out convergence
-        // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
+        not_converged = !converged; 
         ++(*iterations);
     }
-
 
     cudaEventRecord(end_time);
     cudaEventSynchronize(end_time);
@@ -250,7 +284,6 @@ void thrust_kmeans(
     } else {
         *time_per_iteration_ms = iteration_time_ms / *iterations;
     }
-
 
     thrust::copy(device_centroids.begin(), device_centroids.end(), centroids->begin());
     thrust::copy(device_labels.begin(), device_labels.end(), labels->begin());
