@@ -116,7 +116,7 @@ struct CheckConvergence {
             distance_squared += difference * difference;
         }
 
-        return distance_squared > threshold * threshold
+        return distance_squared <= threshold * threshold;
         // if (distance_squared > threshold * threshold) {
         //     return false;
         // } else {
