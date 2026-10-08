@@ -260,7 +260,7 @@ void thrust_kmeans(
         );
 
         // check convergence
-        not_converged = thrust::none_of(
+        bool all_converged = thrust::all_of(
             thrust::make_counting_iterator(0),
             thrust::make_counting_iterator(opts->num_clusters),
             CheckConvergence{
@@ -271,6 +271,7 @@ void thrust_kmeans(
             }
         );
         // Copy out convergence
+        not_converged = !all_converged;
         ++(*iterations);
     }
 
