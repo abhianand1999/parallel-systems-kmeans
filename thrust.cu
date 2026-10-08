@@ -107,7 +107,7 @@ struct CheckConvergence {
     int dims;
     double threshold;
     
-    __host__ __device__ bool operator()(int cluster) const {
+    __host__ __device__ int operator()(int cluster) const {
         double distance_squared = 0.0;
 
         for (int dim = 0; dim < dims; ++dim) {
@@ -116,11 +116,12 @@ struct CheckConvergence {
             distance_squared += difference * difference;
         }
 
-        if (distance_squared > threshold * threshold) {
-            return false;
-        } else {
-            return true;
-        }
+        return distance_squared > threshold * threshold
+        // if (distance_squared > threshold * threshold) {
+        //     return false;
+        // } else {
+        //     return true;
+        // }
     }
 };
 
@@ -259,7 +260,7 @@ void thrust_kmeans(
         );
 
         // check convergence
-        bool converged = thrust::all_of(
+        not_converged = thrust::none_of(
             thrust::make_counting_iterator(0),
             thrust::make_counting_iterator(opts->num_clusters),
             CheckConvergence{
@@ -270,7 +271,6 @@ void thrust_kmeans(
             }
         );
         // Copy out convergence
-        not_converged = !converged; 
         ++(*iterations);
     }
 
