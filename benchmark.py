@@ -50,7 +50,7 @@ def main():
                      "-s", SEED, "-c"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
+                    universal_newlines=True,
                     check=True,
                 )
                 process_wall_ms = (time.perf_counter() - start_time) * 1000.0
