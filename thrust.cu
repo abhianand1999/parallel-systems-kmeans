@@ -13,5 +13,6 @@ void thrust_kmeans(
     double* time_per_iteration_ms, 
     int* iterations
 ) {
-
+    thrust::device_vector<double> device_points(opts->input_data.begin(), opts->input_data.end());
+    thrust::device_vector<double> device_centroids(centroids.begin(), centroids.end());
 }
