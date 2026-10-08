@@ -40,6 +40,20 @@ struct AssignClosestCentroid {
     }
 };
 
+
+struct CalculateCentroid {
+    thrust::device_vector<double>::iterator points;
+    thrust::device_vector<int>::iterator labels;
+    thrust::device_vector<double>::iterator old_centroids;
+    thrust::device_vector<double>::iterator centroids;
+    int dims;
+    int num_points;
+
+    __host__ __device__ void operator()(int cluster) const {
+        
+    }
+}
+
 void thrust_kmeans(
     KMeansOptions* opts,
     std::vector<double>* centroids, 
@@ -70,8 +84,6 @@ void thrust_kmeans(
         thrust::fill(device_cluster_counts.begin(), device_cluster_counts.end(), 0);
         device_not_converged[0] = 0;
 
-        // Assign each point to its nearest centroid. The counting iterator
-        // supplies point indices 0, 1, ..., num_points - 1.
         thrust::for_each(
             thrust::make_counting_iterator(0),
             thrust::make_counting_iterator(opts->num_points),
@@ -84,8 +96,10 @@ void thrust_kmeans(
             }
         );
 
+        std::swap(device_old_centroids, device_centroids);
+
         // Copy out convergence
-        thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
+        // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
         ++(*iterations);
     }
 
