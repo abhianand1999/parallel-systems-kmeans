@@ -11,6 +11,7 @@
 #include <thrust/reduce.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h> 
+#include <thrust/transform.h>
 
 #include "thrust.hpp"
 #include "cuda_runtime.h"
@@ -96,7 +97,7 @@ struct CalculateNewCentroids {
             centroids[i] = centroid_sums[i] / count;
         }
     }
-}
+};
 
 
 void thrust_kmeans(
@@ -221,7 +222,17 @@ void thrust_kmeans(
 
 
         // calculate new centroids 
-        
+        thrust::for_each(
+            thrust::make_counting_iterator(0),
+            thrust::make_counting_iterator(opts->num_clusters * opts->dims),
+            CalculateNewCentroids{
+                centroid_sums.begin(),
+                device_cluster_counts.begin(),
+                device_centroids.begin(),
+                device_old_centroids.begin(),
+                opts->dims
+            }
+        );
 
         // Copy out convergence
         // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
