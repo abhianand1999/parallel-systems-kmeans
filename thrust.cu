@@ -40,20 +40,6 @@ struct AssignClosestCentroid {
     }
 };
 
-
-struct CalculateCentroid {
-    thrust::device_vector<double>::iterator points;
-    thrust::device_vector<int>::iterator labels;
-    thrust::device_vector<double>::iterator old_centroids;
-    thrust::device_vector<double>::iterator centroids;
-    int dims;
-    int num_points;
-
-    __host__ __device__ void operator()(int cluster) const {
-        
-    }
-}
-
 void thrust_kmeans(
     KMeansOptions* opts,
     std::vector<double>* centroids, 
@@ -97,6 +83,7 @@ void thrust_kmeans(
         );
 
         std::swap(device_old_centroids, device_centroids);
+        thrust::fill(device_centroids.begin(), device_centroids.end(), 0.0);
 
         // Copy out convergence
         // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
