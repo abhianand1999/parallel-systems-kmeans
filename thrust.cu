@@ -85,6 +85,12 @@ void thrust_kmeans(
         std::swap(device_old_centroids, device_centroids);
         thrust::fill(device_centroids.begin(), device_centroids.end(), 0.0);
 
+        // Sort labels for groupby agg 
+        thrust::device_vector<int> sorted_labels = device_labels; 
+        thrust::device_vector<int> point_id(opts->num_points);
+        thrust::sequence(point_ids.begin(), point_ids.end());
+        thrust::stable_sort_by_key(sorted_labels.begin(), sorted_labels.end(), point_ids.begin());
+
         // Copy out convergence
         // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
         ++(*iterations);
