@@ -67,6 +67,38 @@ struct CalculateCentroidSum {
     }
 };
 
+
+struct CalculateClusterCounts { 
+    thrust::device_vector<int>::iterator cluster_ids;
+    thrust::device_vector<int>::iterator reduced_cluster_counts;
+    thrust::device_vector<int>::iterator cluster_counts;
+
+    __host__ __device__ void operator()(int cluster_index) const {
+        cluster_counts[cluster_ids[cluster_index]] = reduced_cluster_counts[cluster_index];
+    }
+};
+
+
+struct CalculateNewCentroids {
+    thrust::device_vector<int>::iterator centroid_sums;
+    thrust::device_vector<int>::iterator cluster_counts; 
+    thrust::device_vector<int>::iterator centroids;
+    thrust::device_vector<int>::iterator old_centroids;
+    int dims;
+
+    __host__ __device__ void operator()(int i) const {
+        int cluster = i / dims;
+        int count = cluster_counts[cluster];
+
+        if (!count) {
+            centroids[i] = old_centroids[i];
+        } else {
+            centroids[i] = centroid_sums[i] / count;
+        }
+    }
+}
+
+
 void thrust_kmeans(
     KMeansOptions* opts,
     std::vector<double>* centroids, 
@@ -81,7 +113,7 @@ void thrust_kmeans(
     thrust::device_vector<int> device_cluster_counts(opts->num_clusters);
     thrust::device_vector<int> device_not_converged(1);
     
-    // additional for reduce by key
+    // additional ds for reduce by key - sums
     thrust::device_vector<int> sorted_labels(opts->num_points); 
     thrust::device_vector<int> point_ids(opts->num_points);
 
@@ -89,6 +121,10 @@ void thrust_kmeans(
     thrust::device_vector<double> reduced_sums(opts->num_points);
     thrust::device_vector<double> centroid_sums(opts->num_clusters * opts->dims);
     thrust::device_vector<double> coordinate_values(opts->num_points);
+
+    // additional ds for normalization
+    thrust::device_vector<int> partial_cluster_counts(opts->num_points, 1);
+    thrust::device_vector<int> reduced_cluster_counts(opts->num_points);
 
     int not_converged = 1;
 
@@ -124,6 +160,29 @@ void thrust_kmeans(
         thrust::copy(device_labels.begin(), device_labels.end(), sorted_labels.begin());
         thrust::sequence(point_ids.begin(), point_ids.end());
         thrust::stable_sort_by_key(sorted_labels.begin(), sorted_labels.end(), point_ids.begin());
+
+        // calculate cluster counts
+        auto count_result = thrust::reduce_by_key(
+            sorted_labels.begin(),
+            sorted_labels.end(),
+            partial_cluster_counts.begin(),
+            reduced_cluster_ids.begin(),
+            reduced_cluster_counts.begin()
+        );
+
+        int num_count_groups = static_cast<int>(
+            count_result.first - reduced_cluster_ids.begin()
+        );
+
+        thrust::for_each(
+            thrust::make_counting_iterator(0),
+            thrust::make_counting_iterator(num_count_groups),
+            CalculateClusterCounts{
+                reduced_cluster_ids.begin(),
+                reduced_cluster_counts.begin(),
+                device_cluster_counts.begin()
+            }
+        );
         
         // calculate sums
         thrust::fill(centroid_sums.begin(), centroid_sums.end(), 0.0);
@@ -159,6 +218,10 @@ void thrust_kmeans(
                 }
             );
         }
+
+
+        // calculate new centroids 
+        
 
         // Copy out convergence
         // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
