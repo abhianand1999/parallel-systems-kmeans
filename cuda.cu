@@ -2,6 +2,7 @@
 #include <vector> 
 #include <cstddef> 
 #include <cfloat>
+#include <chrono>
 
 #include "cuda.hpp"
 #include "cuda_runtime.h"
@@ -149,6 +150,11 @@ void cuda_kmeans(
     double* time_per_iteration_ms, 
     int* iterations
 ) {
+    using Clock = std::chrono::steady_clock;
+    const auto end_to_end_start = Clock::now();
+    double h2d_transfer_ms = 0.0;
+    double d2h_transfer_ms = 0.0;
+
     /*
     Copy data from CPU memory to GPU memory.
     Invoke kernels to operate on the data stored in GPU memory.
@@ -178,8 +184,10 @@ void cuda_kmeans(
     int* device_not_converged = nullptr; 
     cudaMalloc((void**) &device_not_converged, (size_t) sizeof(int)); 
 
+    auto transfer_start = Clock::now();
     cudaMemcpy(device_points, opts->input_data.data(), point_bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(device_centroids, centroids->data(), centroid_bytes, cudaMemcpyHostToDevice);
+    h2d_transfer_ms = std::chrono::duration<double, std::milli>(Clock::now() - transfer_start).count();
     
     int not_converged = 1;
 
@@ -272,7 +280,9 @@ void cuda_kmeans(
             std::cerr << "cuda sync failure";
         }
 
+        transfer_start = Clock::now();
         cudaMemcpy(&not_converged, device_not_converged, sizeof(int), cudaMemcpyDeviceToHost);
+        d2h_transfer_ms += std::chrono::duration<double, std::milli>(Clock::now() - transfer_start).count();
         ++(*iterations);
     }
 
@@ -288,8 +298,10 @@ void cuda_kmeans(
     }
 
     // Copy out data
+    transfer_start = Clock::now();
     cudaMemcpy(centroids->data(), device_centroids, centroid_bytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(labels->data(), device_labels, labels_bytes, cudaMemcpyDeviceToHost);
+    d2h_transfer_ms += std::chrono::duration<double, std::milli>(Clock::now() - transfer_start).count();
 
     // Cleanup 
     cudaFree(device_not_converged);
@@ -299,4 +311,9 @@ void cuda_kmeans(
     cudaFree(device_centroids);
     cudaFree(device_points);
     cudaDeviceSynchronize();
+
+    double end_to_end_ms = std::chrono::duration<double, std::milli>(Clock::now() - end_to_end_start).count();
+    std::cerr << "KMEANS_TRANSFER_TIMING h2d_ms=" << h2d_transfer_ms
+              << " d2h_ms=" << d2h_transfer_ms
+              << " total_ms=" << end_to_end_ms << '\n';
 }
