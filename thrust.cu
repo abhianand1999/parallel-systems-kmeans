@@ -87,7 +87,7 @@ void thrust_kmeans(
 
         // Sort labels for groupby agg 
         thrust::device_vector<int> sorted_labels = device_labels; 
-        thrust::device_vector<int> point_id(opts->num_points);
+        thrust::device_vector<int> point_ids(opts->num_points);
         thrust::sequence(point_ids.begin(), point_ids.end());
         thrust::stable_sort_by_key(sorted_labels.begin(), sorted_labels.end(), point_ids.begin());
 
