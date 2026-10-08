@@ -8,6 +8,9 @@
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
 #include <thrust/iterator/counting_iterator.h>
+#include <thrust/reduce.h>
+#include <thrust/sequence.h>
+#include <thrust/sort.h> 
 
 #include "thrust.hpp"
 #include "cuda_runtime.h"
@@ -40,6 +43,30 @@ struct AssignClosestCentroid {
     }
 };
 
+
+struct GetCoordinate {
+    thrust::device_vector<double>::iterator points;
+    int dims;
+    int coordinate;
+
+    __host__ __device__
+    double operator()(int point) const {
+        return points[point * dims + coordinate];
+    }
+};
+
+struct CalculateCentroidSum {
+    thrust::device_vector<int>::iterator cluster_ids;
+    thrust::device_vector<double>::iterator reduced_sums;
+    thrust::device_vector<double>::iterator centroid_sums;
+    int dims;
+    int coordinate;
+
+    __host__ __device__ void operator()(int cluster_index) const {
+        centroid_sums[cluster_ids[cluster_index] * dims + coordinate] = reduced_sums[cluster_index];
+    }
+};
+
 void thrust_kmeans(
     KMeansOptions* opts,
     std::vector<double>* centroids, 
@@ -53,7 +80,15 @@ void thrust_kmeans(
     thrust::device_vector<int> device_labels(opts->num_points);
     thrust::device_vector<int> device_cluster_counts(opts->num_clusters);
     thrust::device_vector<int> device_not_converged(1);
+    
+    // additional for reduce by key
+    thrust::device_vector<int> sorted_labels(opts->num_points); 
+    thrust::device_vector<int> point_ids(opts->num_points);
 
+    thrust::device_vector<int> reduced_cluster_ids(opts->num_points);
+    thrust::device_vector<double> reduced_sums(opts->num_points);
+    thrust::device_vector<double> centroid_sums(opts->num_clusters * opts->dims);
+    thrust::device_vector<double> coordinate_values(opts->num_points);
 
     int not_converged = 1;
 
@@ -86,10 +121,44 @@ void thrust_kmeans(
         thrust::fill(device_centroids.begin(), device_centroids.end(), 0.0);
 
         // Sort labels for groupby agg 
-        thrust::device_vector<int> sorted_labels = device_labels; 
-        thrust::device_vector<int> point_ids(opts->num_points);
+        thrust::copy(device_labels.begin(), device_labels.end(), sorted_labels.begin());
         thrust::sequence(point_ids.begin(), point_ids.end());
         thrust::stable_sort_by_key(sorted_labels.begin(), sorted_labels.end(), point_ids.begin());
+        
+        // calculate sums
+        thrust::fill(centroid_sums.begin(), centroid_sums.end(), 0.0);
+
+        for (int dim = 0; dim < opts->dims; ++dim) {
+            // Get this coordinate for each point, in sorted-label order.
+            thrust::transform(
+                point_ids.begin(),
+                point_ids.end(),
+                coordinate_values.begin(),
+                GetCoordinate{device_points.begin(), opts->dims, dim}
+            );
+
+            auto result = thrust::reduce_by_key(
+                sorted_labels.begin(),
+                sorted_labels.end(),
+                coordinate_values.begin(),
+                reduced_cluster_ids.begin(),
+                reduced_sums.begin()
+            );
+
+            int num_reduced = static_cast<int>(result.first - reduced_cluster_ids.begin());
+
+            thrust::for_each(
+                thrust::make_counting_iterator(0),
+                thrust::make_counting_iterator(num_reduced),
+                CalculateCentroidSum{
+                    reduced_cluster_ids.begin(),
+                    reduced_sums.begin(),
+                    centroid_sums.begin(),
+                    opts->dims,
+                    dim
+                }
+            );
+        }
 
         // Copy out convergence
         // thrust::copy(device_not_converged.begin(), device_not_converged.end(), &not_converged);
